@@ -1,0 +1,215 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  AGENT
+  ADMIN
+}
+
+enum PropertyType {
+  VILLA
+  APARTMENT
+  LAND
+  SHOP
+  OFFICE
+  DUPLEX
+}
+
+enum ListingType {
+  SALE
+  RENT
+}
+
+enum PropertyStatus {
+  ACTIVE
+  SOLD
+  DRAFT
+  PENDING
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CLOSED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String?
+  name         String
+  phone        String?
+  avatar       String?
+  role         Role          @default(USER)
+  createdAt    DateTime      @default(now())
+  agent        Agent?
+  favorites    Favorite[]
+  savedSearches SavedSearch[]
+  reviews      Review[]
+  blogPosts    BlogPost[]
+}
+
+model Agent {
+  id         String     @id @default(cuid())
+  userId     String     @unique
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  officeId   String?
+  office     Office?    @relation(fields: [officeId], references: [id])
+  title      String
+  bio        String?
+  languages  String[]
+  photo      String?
+  rating     Float      @default(0)
+  soldCount  Int        @default(0)
+  featured   Boolean    @default(false)
+  properties Property[]
+  reviews    Review[]
+  leads      Lead[]
+}
+
+model Office {
+  id        String   @id @default(cuid())
+  name      String
+  city      String
+  address   String
+  lat       Float
+  lng       Float
+  phone     String
+  email     String?
+  photo     String?
+  agents    Agent[]
+  properties Property[]
+  createdAt DateTime @default(now())
+}
+
+model Property {
+  id              String          @id @default(cuid())
+  slug            String          @unique
+  title           String
+  description     String
+  type            PropertyType
+  listingType     ListingType
+  status          PropertyStatus  @default(ACTIVE)
+  price           Float
+  currency        String          @default("EUR")
+  priceOnRequest  Boolean         @default(false)
+  areaM2          Float
+  rooms           Int?
+  bathrooms       Int?
+  floor           Int?
+  yearBuilt       Int?
+  city            String
+  neighborhood    String
+  address         String
+  lat             Float
+  lng             Float
+  featured        Boolean         @default(false)
+  viewsCount      Int             @default(0)
+  agentId         String
+  agent           Agent           @relation(fields: [agentId], references: [id])
+  officeId        String?
+  office          Office?         @relation(fields: [officeId], references: [id])
+  images          PropertyImage[]
+  amenities       PropertyAmenity[]
+  favorites       Favorite[]
+  leads           Lead[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([city, type, listingType, price])
+  @@index([featured])
+  @@index([createdAt])
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  url        String
+  orderIndex Int      @default(0)
+  isCover    Boolean  @default(false)
+}
+
+model Amenity {
+  id         String            @id @default(cuid())
+  name       String            @unique
+  icon       String
+  properties PropertyAmenity[]
+}
+
+model PropertyAmenity {
+  propertyId String
+  amenityId  String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenity    Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  @@id([propertyId, amenityId])
+}
+
+model Favorite {
+  userId     String
+  propertyId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  @@id([userId, propertyId])
+}
+
+model SavedSearch {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  filterJson     Json
+  alertFrequency String   @default("weekly")
+  createdAt      DateTime @default(now())
+}
+
+model Lead {
+  id         String     @id @default(cuid())
+  propertyId String?
+  property   Property?  @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  agentId    String?
+  agent      Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  name       String
+  email      String
+  phone      String?
+  message    String
+  status     LeadStatus @default(NEW)
+  createdAt  DateTime   @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  agentId   String
+  userId    String
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  cover       String?
+  excerpt     String
+  bodyMd      String
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+}
